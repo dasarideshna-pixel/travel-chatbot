@@ -7,7 +7,7 @@ import re
 import difflib
 import random
 
-# ==================== PAGE CONFIG & CSS STYLING ====================
+# ==================== PAGE SETUP & MODERN UI ====================
 st.set_page_config(
     page_title="VoyageAI — Intelligent Travel Planner",
     page_icon="🧭",
@@ -21,7 +21,7 @@ st.markdown("""
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
     
     .hero-container {
-        padding: 1.3rem 1.6rem;
+        padding: 1.4rem 1.6rem;
         background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 50%, #06b6d4 100%);
         border-radius: 16px;
         color: white;
@@ -105,15 +105,15 @@ def load_data():
 df = load_data()
 
 
-# ==================== SIDEBAR CONTROL PANEL ====================
+# ==================== SIDEBAR CONTROLS ====================
 with st.sidebar:
-    st.markdown("### 🧭 **VoyageAI Control Center**")
+    st.markdown("### 🧭 **VoyageAI Controls**")
     
     st.markdown(f"""
     <div class="sidebar-kpi">
         <span style="font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; font-weight: 600;">Data Reservoir</span><br>
         <span style="font-size: 1.5rem; font-weight: 700; color: #38bdf8;">{len(df):,} Destinations</span>
-        <div style="font-size: 0.75rem; color: #cbd5e1; margin-top: 4px;">Indexed Across 28 States & UTs</div>
+        <div style="font-size: 0.75rem; color: #cbd5e1; margin-top: 4px;">Verified Indian Tourism Records</div>
     </div>
     """, unsafe_allow_html=True)
     
@@ -125,16 +125,15 @@ with st.sidebar:
         st.rerun()
 
     st.markdown("---")
-    st.markdown("#### 🎯 **Trip Customizer**")
+    st.markdown("#### 🎯 **Custom Search Filters**")
 
-    # Form to batch filter selections
     with st.form("sidebar_filter_form"):
         zones = ["All"] + sorted([z for z in df["zone"].unique() if z])
         selected_zone = st.selectbox("📍 Geographic Zone", zones)
 
         available_states = df[df["zone"] == selected_zone]["state"] if selected_zone != "All" else df["state"]
         states = ["All"] + sorted([s for s in available_states.unique() if s])
-        selected_state = st.selectbox("🏛️ State / Union Territory", states)
+        selected_state = st.selectbox("🏛️ State / UT", states)
 
         types = ["All"] + sorted([t for t in df["type"].unique() if t])
         selected_type = st.selectbox("🏷️ Attraction Theme", types)
@@ -145,9 +144,9 @@ with st.sidebar:
         max_limit = int(df["entrance fee in inr"].max()) if "entrance fee in inr" in df.columns else 1000
         max_fee = st.slider("💰 Max Budget (Entrance Fee ₹)", min_value=0, max_value=max_limit, value=max_limit, step=50)
 
-        min_rating = st.slider("⭐ Minimum Rating Threshold", min_value=1.0, max_value=5.0, value=3.5, step=0.1)
+        min_rating = st.slider("⭐ Min Rating Threshold", min_value=1.0, max_value=5.0, value=3.5, step=0.1)
 
-        dslr_option = st.radio("📷 Camera Policy", ["Any Policy", "DSLR Permitted Only"], horizontal=True)
+        dslr_option = st.radio("📷 Camera Rule", ["Any Policy", "DSLR Permitted Only"], horizontal=True)
 
         apply_filters_btn = st.form_submit_button("⚡ Apply Filters", use_container_width=True)
 
@@ -173,24 +172,21 @@ def fuzzy_find(term, choices, cutoff=0.7):
 
 def generate_itinerary_and_cards(dataframe, lead_message=""):
     if dataframe.empty:
-        return "I couldn't find destinations matching those exact criteria. Try lowering the minimum rating or clearing some filters.", ""
+        return "I couldn't find destinations matching those exact criteria. Try lowering the minimum rating or adjusting your filters.", ""
     
     top_picks = dataframe.sort_values(by="google review rating", ascending=False).head(3)
     
-    # Calculate Totals
     total_fee = int(top_picks["entrance fee in inr"].sum())
     total_time = round(top_picks["time needed to visit in hrs"].sum(), 1)
     
     slots = ["🌅 Slot 1: Morning (09:30 AM)", "☀️ Slot 2: Afternoon (02:00 PM)", "🌆 Slot 3: Evening (05:30 PM)"]
     
-    # Formatted UI response
     response = f"{lead_message}\n\n"
     response += f"""
 <div class="cost-summary">
-    💰 <strong>Total Est. Entry Fee:</strong> ₹{total_fee} &nbsp;|&nbsp; ⏱️ <strong>Total Sightseeing Duration:</strong> ~{total_time} Hours
+    💰 <strong>Total Est. Ticket Budget:</strong> ₹{total_fee} &nbsp;|&nbsp; ⏱️ <strong>Total Sightseeing Time:</strong> ~{total_time} Hours
 </div>
 """
-    # Plain text format for download
     download_text = f"VOYAGEAI CURATED TRAVEL ITINERARY\n{'='*45}\n"
     download_text += f"Total Estimated Ticket Cost: INR {total_fee}\nTotal Exploration Time: ~{total_time} Hours\n\n"
 
@@ -243,7 +239,7 @@ def generate_itinerary_and_cards(dataframe, lead_message=""):
 def process_query(user_input, zone, state, p_type, sig, max_cost, min_rate, dslr, is_filter_only=False):
     data = df.copy()
 
-    # 1. Base Sidebar Filtering
+    # 1. Apply Sidebar Selection
     if zone != "All": data = data[data["zone"].str.lower() == zone.lower()]
     if state != "All": data = data[data["state"].str.lower() == state.lower()]
     if p_type != "All": data = data[data["type"].str.lower() == p_type.lower()]
@@ -398,6 +394,7 @@ if st.session_state.last_itinerary_text:
         data=st.session_state.last_itinerary_text,
         file_name="VoyageAI_Travel_Plan.txt",
         mime="text/plain",
+        key="export_itinerary_btn",
         help="Download formatted itinerary with Google Maps links"
     )
 
@@ -414,4 +411,3 @@ if user_prompt := st.chat_input("Ask a question (e.g. '1 day in Jaipur', 'Places
         
     with st.chat_message("assistant"):
         st.markdown(bot_reply, unsafe_allow_html=True)
-    st.rerun()
