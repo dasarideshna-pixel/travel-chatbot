@@ -105,7 +105,7 @@ def load_data():
 df = load_data()
 
 
-# ==================== SIDEBAR CONTROLS ====================
+# ==================== DYNAMIC SIDEBAR CONTROLS ====================
 with st.sidebar:
     st.markdown("### 🧭 **VoyageAI Controls**")
     
@@ -113,7 +113,7 @@ with st.sidebar:
     <div class="sidebar-kpi">
         <span style="font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; font-weight: 600;">Data Reservoir</span><br>
         <span style="font-size: 1.5rem; font-weight: 700; color: #38bdf8;">{len(df):,} Destinations</span>
-        <div style="font-size: 0.75rem; color: #cbd5e1; margin-top: 4px;">Verified Indian Tourism Records</div>
+        <div style="font-size: 0.75rem; color: #cbd5e1; margin-top: 4px;">Indexed Across 28 States & UTs</div>
     </div>
     """, unsafe_allow_html=True)
     
@@ -127,28 +127,41 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("#### 🎯 **Custom Search Filters**")
 
-    with st.form("sidebar_filter_form"):
-        zones = ["All"] + sorted([z for z in df["zone"].unique() if z])
-        selected_zone = st.selectbox("📍 Geographic Zone", zones)
+    # 1. Zone Filter
+    zones = ["All"] + sorted([z for z in df["zone"].unique() if z])
+    selected_zone = st.selectbox("📍 Geographic Zone", zones)
 
-        available_states = df[df["zone"] == selected_zone]["state"] if selected_zone != "All" else df["state"]
-        states = ["All"] + sorted([s for s in available_states.unique() if s])
-        selected_state = st.selectbox("🏛️ State / UT", states)
+    # 2. Dynamic Cascading States (Filters states strictly by the chosen zone)
+    if selected_zone != "All":
+        filtered_states = df[df["zone"].str.lower() == selected_zone.lower()]["state"]
+    else:
+        filtered_states = df["state"]
+        
+    states = ["All"] + sorted([s for s in filtered_states.unique() if s])
+    selected_state = st.selectbox("🏛️ State / UT", states)
 
-        types = ["All"] + sorted([t for t in df["type"].unique() if t])
-        selected_type = st.selectbox("🏷️ Attraction Theme", types)
+    # 3. Dynamic Categories based on Zone/State selection
+    sub_df = df.copy()
+    if selected_zone != "All":
+        sub_df = sub_df[sub_df["zone"].str.lower() == selected_zone.lower()]
+    if selected_state != "All":
+        sub_df = sub_df[sub_df["state"].str.lower() == selected_state.lower()]
+        
+    types = ["All"] + sorted([t for t in sub_df["type"].unique() if t])
+    selected_type = st.selectbox("🏷️ Attraction Theme", types)
 
-        significances = ["All"] + sorted([s for s in df["significance"].unique() if s]) if "significance" in df.columns else ["All"]
-        selected_sig = st.selectbox("✨ Cultural Significance", significances)
+    significances = ["All"] + sorted([s for s in sub_df["significance"].unique() if s]) if "significance" in sub_df.columns else ["All"]
+    selected_sig = st.selectbox("✨ Cultural Significance", significances)
 
-        max_limit = int(df["entrance fee in inr"].max()) if "entrance fee in inr" in df.columns else 1000
-        max_fee = st.slider("💰 Max Budget (Entrance Fee ₹)", min_value=0, max_value=max_limit, value=max_limit, step=50)
+    max_limit = int(df["entrance fee in inr"].max()) if "entrance fee in inr" in df.columns else 1000
+    max_fee = st.slider("💰 Max Budget (Entrance Fee ₹)", min_value=0, max_value=max_limit, value=max_limit, step=50)
 
-        min_rating = st.slider("⭐ Min Rating Threshold", min_value=1.0, max_value=5.0, value=3.5, step=0.1)
+    min_rating = st.slider("⭐ Min Rating Threshold", min_value=1.0, max_value=5.0, value=3.5, step=0.1)
 
-        dslr_option = st.radio("📷 Camera Rule", ["Any Policy", "DSLR Permitted Only"], horizontal=True)
+    dslr_option = st.radio("📷 Camera Rule", ["Any Policy", "DSLR Permitted Only"], horizontal=True)
 
-        apply_filters_btn = st.form_submit_button("⚡ Apply Filters", use_container_width=True)
+    # Trigger button to run search
+    apply_filters_btn = st.button("⚡ Apply Filters", use_container_width=True, type="primary")
 
 
 # ==================== NLP SEARCH & ITINERARY ENGINE ====================
@@ -359,7 +372,7 @@ if "messages" not in st.session_state:
 if "last_itinerary_text" not in st.session_state:
     st.session_state.last_itinerary_text = ""
 
-# Handle Sidebar Form Submission
+# Handle Sidebar "Apply Filters" Click
 if apply_filters_btn:
     tags = []
     if selected_zone != "All": tags.append(f"Zone: **{selected_zone}**")
